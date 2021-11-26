@@ -1,0 +1,32 @@
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script type="text/javascript" src="https://unpkg.com/jquery@3.6.0/dist/jquery.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/leaflet@1.0.1/dist/leaflet-src.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/leaflet@0.7.7/dist/leaflet.css">
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/leaflet-geosearch@3.6.0/dist/geosearch.css">
+    <script type="text/javascript" src="https://unpkg.com/leaflet-geosearch@3.6.0/dist/geosearch.umd.js"></script>
+    <script type="text/javascript" src="./JqLeaflet.js"></script>
+    <script type="text/javascript">
+        window.onload = function() {
+            var latInput = $("#lat");
+            var lngInput = $("#lng");
+            debugger
+            var JQLeaflet = new JqLeaflet({
+                latInput,
+                lngInput
+            });
+        }
+    </script>
+</head>
+
+<body>
+    <label for="lat">Latitude : </label>
+    <input type="text" id="lat" name="lat" />
+    <label for="lng">Longitude : </label>
+    <input type="text" id="lng" name="lng" />
+    <div id="map" style="height: 400px;"></div>
+</body>
+
+</html>
