@@ -1,16 +1,18 @@
 declare var GeoSearch: any;
 declare var L: any;
 declare var $: any;
+interface Position {
+    lat: any;
+    lng: any;
+    label?: string;
+}
 declare class JqLeaflet {
     map: any;
-    loading: boolean;
-    dragging: boolean;
+    static loading: boolean;
+    static dragging: boolean;
     static icon: any;
     geoSearchOptions: any;
-    position: {
-        lat: any;
-        lng: any;
-    };
+    position: Position;
     static inputOptions: {
         latInput: any;
         lngInput: any;
@@ -19,17 +21,12 @@ declare class JqLeaflet {
         latInput: any;
         lngInput: any;
     });
-    static addMarker(target: any, position: {
-        lat: any;
-        lng: any;
-    }): void;
+    static tooltipContent(position: Position): Promise<string>;
+    static addMarker(target: any, position: Position): void;
     static dragMarker(event: any): void;
-    getAddress(): Promise<string>;
+    static getAddress(position: Position): Promise<string>;
     onMapClick(value: any): void;
     onSearch(value: any): void;
-    getUserPosition(): Promise<{
-        lat: any;
-        lng: any;
-    }>;
+    getUserPosition(): Promise<Position>;
     init(): any;
 }

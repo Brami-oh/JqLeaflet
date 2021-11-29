@@ -2,37 +2,41 @@ declare var GeoSearch: any //Leaflet GeoSearch
 declare var L: any //Leaflet
 declare var $: any //JQUery
 
+interface Position {lat: any, lng: any, label?: string}
+
 class JqLeaflet {
     map: any;
-    loading: boolean = false;
-    dragging: boolean = false;
+    static loading: boolean = false;
+    static dragging: boolean = false;
     static icon: any;
     geoSearchOptions: any;
-    position: {lat: any, lng: any} = { lat:"0", lng: "0"};
+    position: Position = { lat:"0", lng: "0", label: "..."};
     static inputOptions: {latInput: any, lngInput: any} = {latInput: {}, lngInput: {}};
 
     constructor(inputOptions: {latInput: any, lngInput: any}){
         JqLeaflet.inputOptions = inputOptions;
-        $.when(this.getUserPosition().then(r => this.position = r))
-        
+        this.getUserPosition().then((r: Position) => {
+            this.position = r
+
         JqLeaflet.icon = L.icon({
             iconRetinaUrl: "https://unpkg.com/leaflet@1.0.1/dist/images/marker-icon-2x.png",
             iconUrl: "https://unpkg.com/leaflet@1.0.1/dist/images/marker-icon.png",
             shadowUrl: "https://unpkg.com/leaflet@1.0.1/dist/images/marker-shadow.png",
         });
+
         var self = this;
         if(inputOptions)
         {
             if(inputOptions.latInput)
                 {
-                    this.position.lat = inputOptions.latInput.value || this.position.lat
+                    this.position.lat = inputOptions.latInput.val() || this.position.lat
                     inputOptions.latInput.on("change", function(){
                         self.map = self.init()
                     })
                     }
 
             if(inputOptions.lngInput)
-                {this.position.lng = inputOptions.lngInput.value || this.position.lng
+                {this.position.lng = inputOptions.lngInput.val() || this.position.lng
                 inputOptions.lngInput.on("change", function(){
                         self.map = self.init()
                     })
@@ -40,54 +44,77 @@ class JqLeaflet {
         }
 
         this.map = this.init()
+        });
+        
     }
 
-    static addMarker(target: any, position: {lat: any, lng: any}){
+    static tooltipContent(position: Position) {
+        var address = position.label || JqLeaflet.getAddress(position);
+      if (JqLeaflet.dragging) return "...";
+      if (JqLeaflet.loading) return "Loading...";
+      return `<strong>${ address && address.replace(
+        ",",
+        "<br/>"
+      )}</strong> <hr/><strong>Latitude:</strong> ${
+        position.lat
+      }<br/> <strong>Longitude:</strong> ${position.lng}`;
+    }
+
+    static addMarker(target: any, position: Position){
         var user = L.latLng([position.lat, position.lng]);
         var marker = L.marker(user, {
             icon: JqLeaflet.icon,
             draggable: true,
             dragend: JqLeaflet.dragMarker
         })
-        .addTo(target)
-        .bindPopup(position.lat.toString()).openPopup()
+        .addTo(target);
+
+        var tooltipContent = JqLeaflet.tooltipContent(position);
+        marker.bindPopup(tooltipContent).openPopup();
 
         // #12 : Update marker popup content on changing it's position
-        marker.on("dragend",function(e: any){
+        marker.on("dragend", function(e: any){
+            var {lat, lng} = e.target._latlng;
+            position.lat = lat;
+            position.lng = lng;
+            position.label = "";
 
-            var chagedPos = e.target.getLatLng();
-            //this.bindPopup(chagedPos.toString()).openPopup();
-            console.log(e)
+            var tooltipContent = JqLeaflet.tooltipContent(position);
+            marker.bindPopup(tooltipContent).openPopup();
+
+            JqLeaflet.inputOptions.latInput.val(position.lat);
+            JqLeaflet.inputOptions.lngInput.val(position.lng);
         });
 
-        JqLeaflet.inputOptions.latInput.value = position.lat;
-        JqLeaflet.inputOptions.lngInput.value = position.lng;
+        JqLeaflet.inputOptions.latInput.val(position.lat);
+        JqLeaflet.inputOptions.lngInput.val(position.lng);
     }
 
     static dragMarker(event: any){
         console.log(event)
     }
 
-    async getAddress() {
-        this.loading = true;
+    static getAddress(position: Position) {
+        JqLeaflet.loading = true;
         let address = "addresse non resolue";
         try {
             const {
                 lat,
                 lng
-            } = this.position;
-            const result = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
-            );
+            } = position;
+            
+            $.ajax({
+                url:`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+                method: "get",
+                async: false,
+                success: (body: any)=>{  address = body.display_name; },
+                error: (e: any)=> { console.error("Reverse Geocode Error->", e); }
+            })
 
-            if (result.status === 200) {
-                const body = result.json() as any;
-                address = await body.display_name;
-            }
         } catch (e) {
             console.error("Reverse Geocode Error->", e);
         }
-        this.loading = false;
+        JqLeaflet.loading = false;
         return address;
     }
 
@@ -95,30 +122,43 @@ class JqLeaflet {
         // place the marker on the clicked spot
         this.position = value.latlng;
 
-        var marker = L.marker(value.latlng, {
-                 draggable:true,
-                 title:"Resource location",
-                 alt:"Resource Location",
-                 riseOnHover:true
-                }).addTo(this.map)
-                  .bindPopup(value.latlng.toString()).openPopup();
+        var user = L.latLng([this.position.lat, this.position.lng]);
+        var marker = L.marker(user, {
+            icon: JqLeaflet.icon,
+            draggable: true,
+            dragend: JqLeaflet.dragMarker
+        })
+        .addTo(value.target)
+
+        $.when(JqLeaflet.tooltipContent(this.position)).done((r: string)=> {
+            marker.bindPopup(r).openPopup();
+        });
 
         // #12 : Update marker popup content on changing it's position
-        marker.on("dragend",function(e: any){
+        marker.on("dragend", function(e: any){
+            var {lat, lng} = e.target._latlng;
+            var position:any = {};
+            position.lat = lat;
+            position.lng = lng;
 
-            var chagedPos = e.target.getLatLng();
-            //this.bindPopup(chagedPos.toString()).openPopup();
+            var tooltipContent = JqLeaflet.tooltipContent(position);
+            marker.bindPopup(tooltipContent).openPopup();
 
+            JqLeaflet.inputOptions.latInput.val(lat);
+            JqLeaflet.inputOptions.lngInput.val(lng);
         });
+
+        JqLeaflet.inputOptions.latInput.val(this.position.lat);
+        JqLeaflet.inputOptions.lngInput.val(this.position.lng);
     }
 
     onSearch(value: any) {
         const loc = value.location;
         this.position = {
             lat: loc.y,
-            lng: loc.x
+            lng: loc.x,
+            label: loc.label
         };
-
         JqLeaflet.addMarker(value.target, this.position);
     }
 
@@ -132,7 +172,6 @@ class JqLeaflet {
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                 };
-                console.log("test",self.position)
                 JqLeaflet.addMarker(self.map, self.position);
             });
         }
@@ -148,6 +187,7 @@ class JqLeaflet {
 
         if(this.map){
             JqLeaflet.addMarker(this.map, this.position);
+            return this.map;
         }
 
         var map = L.map("map").setView([48.86, 2.34], 12);
@@ -161,7 +201,7 @@ class JqLeaflet {
             showMarker: false,
             autoClose: true,
         }
-
+        
         const searchControl = new GeoSearchControl(geoSearchOptions);
         map.addControl(searchControl);
 
